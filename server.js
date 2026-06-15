@@ -2,75 +2,74 @@ require('dotenv').config();
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
- 
+
 const app = express();
 const PORT = process.env.PORT || 3000;
- 
-// Middlewares
-app.use(cors()); // Permite peticiones desde Netlify
-app.use(express.json());
- 
-// Configurar el transportador de email
+
+// CORS seguro para Netlify
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST']
+}));
+
+app.use(express.json({ limit: '1mb' }));
+
+// Check env
+if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASS) {
+  console.log('⚠️ Faltan variables de entorno');
+}
+
+// Email config
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER,     // tu@gmail.com
-    pass: process.env.GMAIL_APP_PASS,  // contraseña de app de 16 caracteres
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASS,
   },
 });
- 
-// Ruta de health check
+
+// Health check
 app.get('/', (req, res) => {
   res.send({ status: 'OK', mensaje: 'Servidor funcionando ✓' });
 });
- 
-// Ruta principal: recibe el formulario y envía el email
+
+// CONTACTO
 app.post('/contacto', async (req, res) => {
   const { nombre, email, empresa, mensaje } = req.body;
- 
-  // Validación básica
+
   if (!nombre || !email) {
     return res.status(400).json({ error: 'Nombre y email son obligatorios' });
   }
- 
+
   try {
-    // Email que recibes TÚ (el fundador)
     await transporter.sendMail({
       from: process.env.GMAIL_USER,
       to: process.env.GMAIL_USER,
-      subject: `🚀 Nuevo interesado en tu SaaS: ${nombre}`,
+      subject: `🚀 Nuevo interesado: ${nombre}`,
       html: `
-<h2>Nuevo registro de interés</h2>
-<p><b>Nombre:</b> ${nombre}</p>
-<p><b>Email:</b> ${email}</p>
-<p><b>Empresa:</b> ${empresa || 'No especificó'}</p>
-<p><b>Mensaje:</b> ${mensaje || 'Sin mensaje adicional'}</p>
-<hr>
-<small>Enviado desde tu landing page vía Render</small>
+        <h2>Nuevo registro</h2>
+        <p><b>Nombre:</b> ${nombre}</p>
+        <p><b>Email:</b> ${email}</p>
+        <p><b>Empresa:</b> ${empresa || 'N/A'}</p>
+        <p><b>Mensaje:</b> ${mensaje || 'N/A'}</p>
       `,
     });
- 
-    // Email de confirmación al visitante
+
     await transporter.sendMail({
       from: process.env.GMAIL_USER,
       to: email,
-      subject: '¡Gracias por tu interés! Te contactaremos pronto',
-      html: `
-<h2>Hola ${nombre}, recibimos tu registro ✓</h2>
-<p>Gracias por registrar tu interés. Nos pondremos en contacto
-        contigo muy pronto para contarte más sobre el producto.</p>
-<p>— El equipo</p>
-      `,
+      subject: 'Gracias por tu interés',
+      html: `<h2>Hola ${nombre}</h2><p>Gracias por registrarte 👍</p>`,
     });
- 
-    res.json({ ok: true, mensaje: '¡Registro exitoso! Revisa tu correo.' });
- 
+
+    res.json({ ok: true });
+
   } catch (error) {
-    console.error('Error enviando email:', error);
-    res.status(500).json({ error: 'Error al enviar el correo. Intenta de nuevo.' });
+    console.error(error);
+    res.status(500).json({ error: 'Error enviando correo' });
   }
 });
- 
+
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
