@@ -1,32 +1,19 @@
 require('dotenv').config();
 const express = require('express');
-const nodemailer = require('nodemailer');
 const cors = require('cors');
+const { Resend } = require('resend');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS seguro para Netlify
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST']
 }));
 
-app.use(express.json({ limit: '1mb' }));
-
-// Check env
-if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASS) {
-  console.log('⚠️ Faltan variables de entorno');
-}
-
-// Email config
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASS,
-  },
-});
+app.use(express.json());
 
 // Health check
 app.get('/', (req, res) => {
@@ -42,30 +29,23 @@ app.post('/contacto', async (req, res) => {
   }
 
   try {
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: process.env.GMAIL_USER,
-      subject: `🚀 Nuevo interesado: ${nombre}`,
+    await resend.emails.send({
+      from: 'Kursia <onboarding@resend.dev>',
+      to: 'meliibarramedina@gmail.com',
+      subject: `🚀 Nuevo lead: ${nombre}`,
       html: `
         <h2>Nuevo registro</h2>
         <p><b>Nombre:</b> ${nombre}</p>
         <p><b>Email:</b> ${email}</p>
         <p><b>Empresa:</b> ${empresa || 'N/A'}</p>
         <p><b>Mensaje:</b> ${mensaje || 'N/A'}</p>
-      `,
+      `
     });
 
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: email,
-      subject: 'Gracias por tu interés',
-      html: `<h2>Hola ${nombre}</h2><p>Gracias por registrarte 👍</p>`,
-    });
-
-    res.json({ ok: true });
+    res.json({ ok: true, mensaje: 'Correo enviado correctamente' });
 
   } catch (error) {
-    console.error(error);
+    console.log(error);
     res.status(500).json({ error: 'Error enviando correo' });
   }
 });
